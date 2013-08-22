@@ -1,0 +1,244 @@
+import java_cup.runtime.*;
+import tablaSimbolos.*;
+
+/* Codigo de usuario */
+parser code {:
+	private int line;
+	private int column;
+	private TablaSimbolos tablaActual = new TablaSimbolos();
+
+	public void syntax_error(Symbol cur_token){
+		line = cur_token.left+1;
+		column = cur_token.right+1;
+		
+		System.err.println();
+		System.err.print("Error en linea "+(cur_token.left+1)+" columna "+(cur_token.right+1));
+		if(cur_token.value != null)
+			System.err.print(" en lexema: "+cur_token.value);
+		System.err.print(": ");
+	}
+	
+	public void unrecovered_syntax_error(Symbol cur_token) {
+		System.err.println("Error de sintaxis en la línea " + line + " columna " + column);
+	}
+	
+	public void syntax_error(String msg){
+		System.err.println(msg);
+	}
+:}
+
+/* Terminales */
+terminal PROGRAM;
+terminal BEGIN;
+terminal END;
+terminal CONST;
+terminal VAR;
+terminal PROCEDURE;
+terminal FUNCTION;
+terminal TYPE;
+terminal RECORD;
+terminal PCOMA;
+terminal PUNTO;
+terminal COMA;
+terminal PAR_ABR;
+terminal PAR_CER;
+terminal DOS_PUNTOS;
+terminal ASIG;
+terminal SUMA;
+terminal RESTA;
+terminal Symbol ID;
+terminal Symbol NUM_CONST;
+terminal MULT;
+terminal MENOR;
+terminal MENORIGUAL;
+terminal DISTINTO;
+terminal IGUAL;
+terminal MAYOR;
+terminal MAYORIGUAL;
+terminal NOT;
+terminal AND;
+terminal OR;
+terminal MOD;
+terminal DIV;
+terminal Symbol COM_CORTO;
+terminal Symbol COM_LARGO;
+terminal Symbol COM_AUTOR;
+terminal Symbol COM_PARAM;
+terminal Symbol COM_RETORNO;
+terminal Symbol CTE_LITERAL;
+terminal DO;
+terminal WHILE;
+terminal Symbol LEXERROR;
+
+/* No terminales */
+non terminal Temporal prg;
+non terminal Temporal blq;
+non terminal Temporal dcllist;
+non terminal Temporal sentlist;
+non terminal Temporal comment;
+non terminal Temporal dcl;
+non terminal Temporal defcte;
+non terminal Temporal ctelist;
+non terminal Literal simpvalue;
+non terminal Temporal commentlist;
+non terminal Temporal defvar;
+non terminal Temporal defvarlist;
+non terminal Temporal varlist;
+non terminal Temporal defproc;
+non terminal Temporal deffun;
+non terminal Temporal formal_paramlist;
+non terminal Temporal formal_param;
+non terminal Temporal subpcomment;
+non terminal Temporal sent;
+non terminal Temporal asig;
+non terminal Temporal id;
+non terminal Temporal exp;
+non terminal Temporal superexp;
+non terminal Temporal fact;
+non terminal Temporal superfact;
+non terminal Temporal term;
+non terminal Temporal superterm;
+non terminal Temporal op_adit;
+non terminal Temporal op_comp;
+non terminal Temporal op_mult;
+non terminal Temporal subpparamlist;
+non terminal Temporal explist;
+non terminal Temporal proc_call;
+non terminal Temporal exeblq;
+non terminal Temporal dcllist_blq;
+non terminal Temporal dcl_blq;
+non terminal Temporal deftype;
+non terminal Temporal typelist;
+non terminal Temporal udtype;
+non terminal Temporal wloop;
+
+/* GRAMATICA */
+
+prg ::= PROGRAM ID {: tablaActual.addSymbol(new Variable(ID, "Program")); :} PCOMA COM_AUTOR comment blq PUNTO
+	| PROGRAM ID {: tablaActual.addSymbol(new Variable(ID, "Program")); :} PCOMA COM_AUTOR blq PUNTO ;
+
+
+blq ::= {: tablaActual = new TablaSimbolos(tablaActual); :} dcllist BEGIN sentlist END
+	| {: tablaActual = new TablaSimbolos(tablaActual); :} BEGIN sentlist END ;
+
+
+dcllist ::= dcllist PCOMA dcl
+	| PCOMA dcl ;
+
+
+sentlist ::= sent
+	| sentlist PCOMA sent ;
+
+comment ::= COM_CORTO
+	| COM_CORTO COM_LARGO ;
+
+dcl ::= defcte 
+	| defvar 
+	| defproc 
+	| deffun 
+	| deftype ;
+
+defcte ::= commentlist CONST ctelist
+	| CONST ctelist ;
+
+ctelist ::= ID IGUAL simpvalue PCOMA {: if (!tablaActual.esVisible()) tablaActual.addSymbol(new Constante(ID, simpvalue.getValor(), simpvalue.getTipo())); :}
+	| ctelist ID IGUAL simpvalue PCOMA {: if (!tablaActual.esVisible()) tablaActual.addSymbol(new Constante(ID, simpvalue.getValor(), simpvalue.getTipo())); :} ;
+
+simpvalue ::= NUM_CONST {: RESULT = new Literal(NUM_CONST.value, "Real"); :} 
+	| CTE_LITERAL {: RESULT = new Literal(CTE_LITERAL.value, "String"); :}
+
+commentlist ::=  commentlist comment 
+	| comment;
+
+defvar ::= VAR defvarlist ;
+
+defvarlist ::= commentlist varlist DOS_PUNTOS ID {: PCOMA 
+	| commentlist varlist DOS_PUNTOS ID PCOMA defvarlist 
+	| varlist DOS_PUNTOS ID PCOMA 
+	| varlist DOS_PUNTOS ID PCOMA defvarlist ;
+
+varlist ::= {: RESULT = new ListaIDS(); :} ID {: RESULT.add(ID); :}
+	| {: RESULT.add(ID); :} ID COMA varlist {: RESULT.add(varlist); :} ;
+	
+defproc ::=  subpcomment PROCEDURE ID formal_paramlist PCOMA blq PCOMA 
+	| subpcomment PROCEDURE ID PCOMA blq PCOMA 
+	| PROCEDURE ID formal_paramlist PCOMA blq PCOMA 
+	| PROCEDURE ID PCOMA blq PCOMA ;
+
+deffun ::=  subpcomment FUNCTION ID formal_paramlist DOS_PUNTOS ID PCOMA blq PCOMA 
+	| subpcomment FUNCTION ID DOS_PUNTOS ID PCOMA blq PCOMA 
+	| FUNCTION ID formal_paramlist DOS_PUNTOS ID PCOMA blq PCOMA 
+	| FUNCTION ID DOS_PUNTOS ID PCOMA blq PCOMA ;
+
+formal_paramlist ::= PAR_ABR formal_param PAR_CER;
+
+formal_param ::= varlist DOS_PUNTOS ID 
+	| varlist DOS_PUNTOS ID PCOMA formal_param;
+	
+subpcomment ::= comment COM_PARAM commentlist COM_RETORNO 
+	| comment COM_PARAM COM_RETORNO ;
+
+sent ::= asig 
+	| proc_call 
+	| exeblq 
+	| wloop;
+
+asig ::= id ASIG exp ;
+
+id ::= ID 
+	| ID PUNTO ID ;
+
+exp ::= exp OR superexp
+	| superexp;
+	
+superexp ::= superexp AND term
+	| term;
+	
+term ::= term op_comp superterm
+	| superterm;
+	
+superterm ::= superterm op_adit fact
+	| fact;
+	
+fact ::= fact op_mult superfact
+	| superfact;
+
+superfact ::= simpvalue
+	| PAR_ABR exp PAR_CER
+	| NOT superfact
+	| ID subpparamlist
+	| ID PUNTO ID
+	| ID ;
+	
+op_adit ::= SUMA | RESTA;
+
+op_mult ::= MULT | DIV | MOD;
+
+op_comp ::= MENOR | MAYOR | MENORIGUAL | MAYORIGUAL | IGUAL | DISTINTO;
+
+subpparamlist ::= PAR_ABR explist PAR_CER;
+	
+explist ::= exp
+	| exp COMA explist;
+	
+proc_call ::= ID subpparamlist
+	| ID;
+	
+exeblq ::= dcllist_blq BEGIN sentlist END
+	| BEGIN sentlist END ;
+
+dcllist_blq ::= dcllist_blq PCOMA dcl_blq 
+	| PCOMA dcl_blq;
+
+dcl_blq ::= defcte 
+	| deftype 
+	| defvar ;
+
+deftype ::= TYPE typelist ;
+
+typelist ::= ID IGUAL udtype PCOMA 
+	| ID IGUAL udtype PCOMA typelist ;
+
+udtype ::= RECORD defvarlist END ;
+
+wloop ::= WHILE exp DO sent ;
